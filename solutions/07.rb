@@ -22,7 +22,7 @@ module LazyMode
 
     def same_week(other)
       week, date = [], other
-      1.upto(6) do
+      1.upto(7) do
         week << date
         date = date.next
       end
@@ -214,5 +214,4 @@ module LazyMode
   def self.create_file(name, &block)
     File.new(name, &block)
   end
-
 end
