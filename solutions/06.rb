@@ -1,180 +1,134 @@
 module TurtleGraphics
 
-  class Turtle
+  module Canvas
 
-    attr_accessor :row, :column, :orientation,
-                  :canvas, :x, :y
-
-    def initialize(row, column)
-      @row, @column = row, column
-      @orientation = :right
-      @canvas = Array.new(@row) { Array.new(@column, 0) }
-      spawn_at(0, 0)
+    class Matrix
+      def draw(canvas)
+        canvas
+      end
     end
 
-    def draw(*arg, &block)
-      instance_eval &block
-      if arg[0]
-        arg[0].draw(@canvas)
-      else
-        @canvas
+    attr_accessor :symbols
+
+    class ASCII
+      def initialize(symbols)
+        @symbols = symbols
       end
+
+      def draw(canvas)
+        max_value = canvas.map(&:max).max
+
+        canvas.map do |row|
+          row.map do |value|
+            intensive_symbol(value.to_f / max_value)
+          end.join('')
+        end.join("\n")
+      end
+
+      def intensive_symbol(intensive)
+        index = (intensive * (@symbols.length - 1)).ceil
+        @symbols[index]
+      end
+    end
+
+    class HTML
+      def initialize(pixels)
+        @pixels = pixels
+      end
+
+      def draw(canvas)
+        "<!DOCTYPE html>
+        <html>#{draw_header}#{draw_body(canvas)}</html>"
+      end
+
+      def draw_header
+        "<head>
+          <title>Turtle graphics</title>
+          <style>
+            table {
+              border-spacing: 0;
+            }
+            tr {
+              padding: 0;
+            }
+            td {
+              width: #{@pixels}px;
+              height: #{@pixels}px;
+              background-color: black;
+              padding: 0;
+            }
+          </style>
+        </head>"
+      end
+
+      def draw_body(canvas)
+        "<body><table>#{draw_table(canvas)}</table></body>"
+      end
+
+      def draw_table(canvas)
+        max_intensity = canvas.map(&:max).max.to_f
+
+        canvas.map do |row|
+          columns = row.map do |intensity|
+            '<td style="opacity: %.2f"></td>' % (intensity / max_intensity)
+          end
+
+          "<tr>#{columns.join('')}</tr>"
+        end.join('')
+      end
+    end
+  end
+
+  class Turtle
+    ORIENTATIONS = [:left, :up, :right, :down].freeze
+
+    def initialize(rows, columns)
+      @canvas = Array.new(rows) { Array.new(columns, 0)}
+
+      @rows, @columns = rows, columns
+      @orientation = :right
+      spawn_at(0,0)
+    end
+
+    def draw(canvas = Canvas::Matrix.new, &block)
+      instance_eval &block
+
+      @canvas[@y][@x] += 1
+
+      canvas.draw(@canvas)
+    end
+
+    private
+
+    def spawn_at(row, column)
+      @y = row
+      @x = column
     end
 
     def look(orientation)
       @orientation = orientation
     end
 
-    def spawn_at(row, column)
-      @y = row
-      @x = column
-      visit
+    def move
+      @canvas[@y][@x] += 1
+
+      case @orientation
+        when :left  then @x -= 1
+        when :up    then @y -= 1
+        when :right then @x += 1
+        when :down  then @y += 1
+      end
+
+      @y %= @rows
+      @x %= @columns
     end
 
     def turn_left
-      @orientation = case @orientation
-      when :up then :left
-      when :left then :down
-      when :down then :right
-      when :right then :up
-      end
+      @orientation = ORIENTATIONS[(ORIENTATIONS.find_index(@orientation) - 1) % 4]
     end
 
     def turn_right
-
-      @orientation = case @orientation
-      when :up then :right
-      when :right then :down
-      when :down then :left
-      when :left then :up
-      end
-
+      @orientation = ORIENTATIONS[(ORIENTATIONS.find_index(@orientation) + 1) % 4]
     end
-
-    def move
-
-      movements = {
-        right: [ 1, 0 ],
-        down: [ 0, 1],
-        left: [ -1, 0 ],
-        up: [ 0, -1 ]
-      }
-      @x += movements[@orientation][0]
-      @y += movements[@orientation][1]
-
-      inbound
-
-      visit
-    end
-
-    def inbound
-
-      if @x > @column - 1 or @x < 0
-        @x = 0
-      elsif @y > @row - 1 or @y < 0
-        @y = 0
-      end
-
-    end
-
-    def visit
-      @canvas[@y][@x] += 1
-    end
-
-  end
-
-  module Canvas
-
-    class ASCII
-
-      attr_accessor :symbols, :intensive
-
-      def initialize(symbols)
-        @symbols = symbols
-      end
-
-      def intensive_symbol(intensive)
-
-        index = (intensive * (symbols.length - 1)).ceil
-        @symbols[index]
-
-      end
-
-      def draw(canvas)
-
-        max_value = canvas.flatten.max
-        canvas.each do |row|
-          row.each do |value|
-            intensive = value.to_f / max_value
-            print intensive_symbol(intensive)
-          end
-          print "\n"
-        end
-
-      end
-
-    end
-
-    class HTML
-
-      def initialize(pixels)
-        @pixels = pixels
-      end
-
-      def draw(canvas)
-        html = draw_header
-        html += draw_css
-        html += draw_table(canvas)
-        html += draw_footer
-      end
-
-      def draw_header
-        return "<!DOCTYPE html>
-<html>
-<head>
-  <title>Turtle graphics</title>"
-      end
-
-      def draw_css
-        return "<style>
-    table {
-      border-spacing: 0;
-    }
-
-    tr {
-      padding: 0;
-    }
-
-    td {
-      width: #{@pixels}px;
-      height: #{@pixels}px;
-
-      background-color: black;
-      padding: 0;
-    }
-</style>"
-      end
-
-      def draw_table(canvas)
-        max_value, table = canvas.flatten.max, "<body><table>"
-        canvas.each do |row|
-          table += "<tr>" + "\n"
-          row.each do |value|
-            intensive = value.to_f / max_value
-            table += "<td style= \"opacity: #{intensive.round(2)}\"></td>" + "\n"
-          end
-          table += "</tr>" + "\n"
-        end
-        table += "</table>"
-        return table
-      end
-
-      def draw_footer
-        return "</body>
-</html>"
-      end
-
-    end
-
   end
 end
